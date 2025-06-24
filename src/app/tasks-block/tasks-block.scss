@@ -1,0 +1,18 @@
+:host {
+  display: block;
+  height: 400px;
+  width: 300px;
+  border: 1px solid #070733;
+  padding-left:4px;
+}
+
+main{
+  height: 100%;
+  display: block;
+  overflow-y: scroll;
+  margin-left:4px;
+
+  #scroll-container{
+    height: max-content;
+  }
+}

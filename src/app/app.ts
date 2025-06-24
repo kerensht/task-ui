@@ -1,9 +1,9 @@
 import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import {TasksBlock} from './tasks-block/tasks-block';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
+  imports: [TasksBlock],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })

@@ -1,0 +1,13 @@
+<main (scroll)="onScroll()" #main>
+  <div id="scroll-container" #scrollContainer [style.height]="scrollContainerHeight+'px'">
+    <div class="margin-blocker" [style.height]="itemWrapperMarginTop+'px'"> </div>
+    <div id="displayed-items-wrapper" [style.height]="innerItemsWrapperHeight+'px'" #itemsWrapper>
+      @for (item of displayedItems; track item.key){
+        <div [style.height]="itemHeight+'px'">
+          {{item.value}}
+        </div>
+      }
+    </div>
+  </div>
+</main>
+
