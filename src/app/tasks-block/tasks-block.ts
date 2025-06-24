@@ -47,8 +47,14 @@ export class TasksBlock implements OnInit, OnDestroy {
     this.fetchInitialData()
   }
 
-  fetchInitialData(){
-    this.fetchNewDataFromServer(0, this.size);
+  async fetchInitialData(){
+    try{
+      await this.fetchNewDataFromServer(0, this.size);
+      this.setItemsForDisplay(0);
+    }catch (err){
+      console.log(err)
+    }
+
   }
 
   async fetchNewDataFromServer(start: number, end: number) {
@@ -64,7 +70,6 @@ export class TasksBlock implements OnInit, OnDestroy {
       }
       this.calculateViewHeights();
       this.cacheData(data.data, start);
-      this.setItemsForDisplay(start)
     }catch (err){
       console.log(err)
     }
@@ -75,7 +80,7 @@ export class TasksBlock implements OnInit, OnDestroy {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     this.debounceTimer = setTimeout(() => {
       this.updateViewOnScroll()
-    }, 100);
+    }, 300);
   }
 
   updateViewOnScroll() {
