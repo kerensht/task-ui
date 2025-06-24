@@ -2,6 +2,7 @@ import {Component, ElementRef, OnDestroy, OnInit, ViewChild} from '@angular/core
 
 const PAGE_SIZE = 100;
 const ITEM_HEIGHT = 22;
+const EXTRA_ROWS = 16;
 
 interface Item {
   key: string;
@@ -34,7 +35,6 @@ export class TasksBlock implements OnInit, OnDestroy {
   //Scrolling
   itemWrapperMarginTop = 0;
   firstDisplayedIndex = 0;
-  lastPxScrolled = 0;
 
   //Pagination data
   size: number = PAGE_SIZE;
@@ -44,60 +44,14 @@ export class TasksBlock implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.fetchData(0, this.size);
+    this.fetchInitialData()
   }
 
-  onScroll() {
-    if (this.debounceTimer) clearTimeout(this.debounceTimer);
-    this.debounceTimer = setTimeout(() => {
-      this.setDisplayedData()
-    }, 200);
+  fetchInitialData(){
+    this.fetchNewDataFromServer(0, this.size);
   }
 
-  setDisplayedData() {
-    const pxScrolled = Math.max(0, -1 * this.scrollContainer?.nativeElement?.getBoundingClientRect()?.top);
-    this.lastPxScrolled = pxScrolled;
-    const scrolledRatio = pxScrolled / this.scrollContainer?.nativeElement?.getBoundingClientRect()?.height;
-    const newFirstDisplayedItemIndex = Math.max(Math.floor(scrolledRatio * this.totalItems), 0);
-    if (newFirstDisplayedItemIndex !== this.firstDisplayedIndex) {
-      this.firstDisplayedIndex = newFirstDisplayedItemIndex;
-      this.setDisplayedItems(this.firstDisplayedIndex, pxScrolled);
-    }
-
-  }
-
-  async setDisplayedItems(firstDisplayedIndex: number, scrollTo: number) {
-    const start = Math.max(0, firstDisplayedIndex - 1);
-    const end = Math.min(firstDisplayedIndex + (this.numberOfItemsToDisplay));
-
-    let needToFetchData = false;
-    let i = start;
-    for (; i < end && i < this.totalItems; i++) {
-      if (!this.cachedData[i]) {
-        needToFetchData = true;
-        break;
-      }
-    }
-    if (!needToFetchData) {
-      let firstIndexForSlice = start;
-      if (start < 0) {
-        firstIndexForSlice = 0;
-      } else if (start > this.totalItems - this.numberOfItemsToDisplay) {
-        firstIndexForSlice = this.totalItems - this.numberOfItemsToDisplay
-      }
-      this.displayedItems = this.cachedData.slice(firstIndexForSlice, end);
-      this.itemWrapperMarginTop = Math.max(scrollTo, 0);
-    } else {
-      const reminder = i % this.size;
-      const closestRoundStart = i - reminder;
-      await this.fetchData(closestRoundStart, closestRoundStart + this.size);
-      this.setDisplayedItems(firstDisplayedIndex, scrollTo);
-    }
-
-    return;
-  }
-
-  async fetchData(start: number, end: number) {
+  async fetchNewDataFromServer(start: number, end: number) {
     if ((this.totalItems && start >= this.totalItems) || this.loading ) return;
     this.loading = true;
     try{
@@ -116,12 +70,63 @@ export class TasksBlock implements OnInit, OnDestroy {
     }
   }
 
-  setItemsForDisplay(start: number){
+
+  onScroll() {
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => {
+      this.updateViewOnScroll()
+    }, 100);
+  }
+
+  updateViewOnScroll() {
+    const pxScrolled = Math.max(0, -1 * this.scrollContainer?.nativeElement?.getBoundingClientRect()?.top);
+    const scrolledRatio = pxScrolled / this.scrollContainer?.nativeElement?.getBoundingClientRect()?.height;
+    const newFirstDisplayedItemIndex = Math.max(Math.floor(scrolledRatio * this.totalItems), 0);
+    if (newFirstDisplayedItemIndex !== this.firstDisplayedIndex) {
+      this.firstDisplayedIndex = newFirstDisplayedItemIndex;
+      this.fetchData(pxScrolled);
+    }
+  }
+
+  async fetchData(scrollTo:number){
+    const firstItemMissingIndexInCache = this.getMissingIndex(this.firstDisplayedIndex);
+    if(firstItemMissingIndexInCache){//Need to fetch more data
+      const reminder = firstItemMissingIndexInCache % this.size;
+      const closestRoundStart = firstItemMissingIndexInCache - reminder;
+      try{
+        await this.fetchNewDataFromServer(closestRoundStart, closestRoundStart + this.size);
+        this.fetchData(scrollTo);
+      }catch (err){
+        console.log(err);
+      }
+    }else{//Set new view from cache
+      this.setItemsForDisplay(this.firstDisplayedIndex, this.firstDisplayedIndex+this.numberOfItemsToDisplay, scrollTo);
+    }
+  }
+
+  getMissingIndex(firstIndexToDisplay:number){
+    const start = Math.max(0, firstIndexToDisplay - 1);
+    const end = Math.min(firstIndexToDisplay + (this.numberOfItemsToDisplay));
+
+    let needToFetchData = false;
+    let i = start;
+    for (; i < end && i < this.totalItems; i++) {
+      if (!this.cachedData[i]) {
+        needToFetchData = true;
+        break;
+      }
+    }
+    if(needToFetchData) return i;
+    return;
+  }
+
+  setItemsForDisplay(start: number, end=this.numberOfItemsToDisplay, scrollTo=0){
     let firstIndexForSlice = start;
     if (start > this.totalItems - this.numberOfItemsToDisplay) {
-      firstIndexForSlice = this.totalItems - this.numberOfItemsToDisplay;//Prevent over scrolling in end of range
+      firstIndexForSlice = this.totalItems - this.numberOfItemsToDisplay;//Prevent end of range over scrolling
     }
-    this.displayedItems = this.cachedData.slice(firstIndexForSlice, this.numberOfItemsToDisplay);
+    this.displayedItems = this.cachedData.slice(firstIndexForSlice, end);
+    this.itemWrapperMarginTop = Math.max(scrollTo, 0);
   }
 
   cacheData(data: { key: string; value: string }[], start: number) {
@@ -132,7 +137,7 @@ export class TasksBlock implements OnInit, OnDestroy {
 
   calculateViewHeights() {
     const mainHeight = this.main?.nativeElement.getBoundingClientRect()?.height;
-    this.numberOfItemsToDisplay = Math.ceil(mainHeight / this.itemHeight);
+    this.numberOfItemsToDisplay = Math.ceil(mainHeight / this.itemHeight)+EXTRA_ROWS;
     this.scrollContainerHeight = this.totalItems * this.itemHeight;
     this.innerItemsWrapperHeight = (this.numberOfItemsToDisplay) * this.itemHeight;
   }
